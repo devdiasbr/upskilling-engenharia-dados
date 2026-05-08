@@ -1,0 +1,5 @@
+recursos/dados.db
+recursos/exports/
+__pycache__/
+*.pyc
+.venv/
