@@ -18,6 +18,25 @@ Nenhum. Este é o módulo inicial da trilha.
 
 8–12 horas de estudo + exercícios
 
-## Dataset
+## Banco de Dados
 
-Usaremos o dataset de e-commerce em `recursos/datasets/`. Leia o `schema.md` antes de começar.
+Usaremos o banco SQLite em `recursos/dados.db`, gerado pelo script `recursos/setup_db.py`.
+
+Para criar o banco antes de começar:
+
+```bash
+python recursos/setup_db.py
+```
+
+O script usa Faker (pt_BR) com seeds fixas (`random.seed(42)` e `Faker.seed(42)`), garantindo que todos os participantes tenham exatamente os mesmos dados.
+
+Leia o `recursos/schema.md` para entender as 4 tabelas: `categorias`, `produtos`, `clientes` e `vendas`.
+
+## Estrutura do Módulo
+
+| Arquivo | Descrição |
+|---|---|
+| `conteudo.md` | Material de leitura com exemplos comentados para todas as seções |
+| `exercicios/exercicios.md` | 9 exercícios em 3 níveis de dificuldade |
+| `exercicios/gabarito.md` | Soluções com explicações (consulte só depois de tentar) |
+| `sessao-ao-vivo.md` | Roteiro para o facilitador da sessão ao vivo de 2 horas |

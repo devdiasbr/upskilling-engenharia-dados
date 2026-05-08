@@ -1,24 +1,33 @@
 # Roteiro da Sessão ao Vivo — Módulo 1: SQL Fundamentals
 
 **Duração total:** 2 horas
-**Formato:** facilitador + participantes com acesso ao banco de dados
-**Pré-requisito para os participantes:** ter lido o `conteudo.md` e tentado os exercícios antes da sessão
+**Formato:** facilitador + participantes com acesso ao banco SQLite
+**Pré-requisito para os participantes:** ter lido o `conteudo.md`, rodado o `setup_db.py` para criar o banco e tentado os exercícios antes da sessão
 
 ---
 
 ## Abertura — 10 min
 
-**Objetivo:** garantir que todo o grupo está no mesmo patamar técnico antes de avançar.
+**Objetivo:** garantir que todo o grupo conseguiu conectar ao banco SQLite antes de avançar.
 
 **Roteiro:**
 
 1. Boas-vindas e apresentação do objetivo da sessão (2 min)
-2. Verificação rápida de ambiente: pedir que todos rodem a query abaixo e confirmem que recebem resultado (3 min):
+2. Verificação de ambiente — pedir que todos rodem a query abaixo e confirmem que recebem resultado (3 min):
 
 ```sql
 SELECT COUNT(*) AS total_vendas FROM vendas;
--- Resultado esperado: 10
+-- Resultado esperado: 3000
 ```
+
+   Caso alguém não consiga, verificar se o banco foi gerado:
+   ```bash
+   python recursos/setup_db.py
+   ```
+
+   Confirmar também as opções de conexão:
+   - SQLite CLI: `sqlite3 recursos/dados.db` → `.headers on` → `.mode column`
+   - Python: `import sqlite3; conn = sqlite3.connect('recursos/dados.db')`
 
 3. Sondagem rápida (levantar a mão ou chat): "Quem tentou todos os exercícios antes de hoje?" (1 min)
 4. Apresentar a agenda da sessão (2 min):
@@ -40,16 +49,18 @@ Confusão comum: usar `WHERE` para filtrar resultados de agregação.
 
 ```sql
 -- ERRADO: WHERE não enxerga colunas agregadas
-SELECT categoria, SUM(preco) AS total
-FROM produtos
-WHERE SUM(preco) > 1000  -- erro de sintaxe
-GROUP BY categoria;
+SELECT cat.nome, SUM(p.preco) AS total
+FROM produtos AS p
+INNER JOIN categorias AS cat ON p.categoria_id = cat.categoria_id
+WHERE SUM(p.preco) > 1000  -- erro de sintaxe
+GROUP BY cat.nome;
 
 -- CORRETO: HAVING filtra após o agrupamento
-SELECT categoria, SUM(preco) AS total
-FROM produtos
-GROUP BY categoria
-HAVING SUM(preco) > 1000;
+SELECT cat.nome, SUM(p.preco) AS total
+FROM produtos AS p
+INNER JOIN categorias AS cat ON p.categoria_id = cat.categoria_id
+GROUP BY cat.nome
+HAVING SUM(p.preco) > 1000;
 ```
 
 **Regra prática:** se a condição envolve uma função de agregação (`SUM`, `COUNT`, `AVG`...), use `HAVING`. Se não, use `WHERE`.
@@ -97,6 +108,27 @@ WHERE v.venda_id IS NULL;
 
 **Armadilha:** usar `WHERE v.cliente_id IS NULL` pode parecer equivalente, mas se `cliente_id` for NOT NULL na tabela `vendas`, o banco pode otimizá-lo de forma diferente. Prefira checar a chave primária da tabela direita (`v.venda_id`).
 
+### Tópico 4 — Funções de data no SQLite
+
+O SQLite não tem `DATE_TRUNC`. Use `strftime` para extrair partes de datas:
+
+```sql
+-- Receita por mês
+SELECT
+    strftime('%Y-%m', data_venda) AS mes,
+    SUM(valor_total)              AS receita_mes
+FROM vendas
+GROUP BY strftime('%Y-%m', data_venda)
+ORDER BY mes;
+
+-- Receita por ano
+SELECT
+    strftime('%Y', data_venda) AS ano,
+    SUM(valor_total)           AS receita_ano
+FROM vendas
+GROUP BY strftime('%Y', data_venda);
+```
+
 ---
 
 ## Exercício em Grupo — 60 min
@@ -131,7 +163,7 @@ Perguntar ao grupo:
 - "O que essa query faz? Consiga explicar em uma frase."
 - "Onde vocês veem desperdício ou redundância?"
 
-Anotar as respostas observadas em lousa/slide colaborativo.
+Anotar as respostas em lousa/slide colaborativo.
 
 ### Etapa 2 — Identificar os problemas coletivamente (15 min)
 
@@ -162,9 +194,9 @@ WITH media_vendas AS (
     FROM vendas
 ),
 clientes_acima_da_media AS (
-    SELECT DISTINCT cliente_id
-    FROM vendas, media_vendas
-    WHERE valor_total > media_vendas.media_geral
+    SELECT DISTINCT v.cliente_id
+    FROM vendas AS v, media_vendas AS m
+    WHERE v.valor_total > m.media_geral
 )
 -- continua...
 ```
@@ -176,15 +208,16 @@ WITH media_vendas AS (
     FROM vendas
 ),
 clientes_acima_da_media AS (
-    SELECT DISTINCT cliente_id
-    FROM vendas, media_vendas
-    WHERE valor_total > media_vendas.media_geral
+    SELECT DISTINCT v.cliente_id
+    FROM vendas AS v, media_vendas AS m
+    WHERE v.valor_total > m.media_geral
 )
 SELECT
     c.cliente_id,
     c.nome,
     c.email,
     c.cidade,
+    c.estado,
     c.data_cadastro
 FROM clientes AS c
 INNER JOIN clientes_acima_da_media AS cam ON c.cliente_id = cam.cliente_id
@@ -193,13 +226,13 @@ ORDER BY c.nome;
 
 Executar e confirmar que o resultado é idêntico à query original.
 
-### Etapa 4 — Comparar os planos de execução com EXPLAIN (15 min)
+### Etapa 4 — Analisar o plano de execução no SQLite (15 min)
 
-Rodar `EXPLAIN ANALYZE` nas duas versões e comparar lado a lado:
+No SQLite use `EXPLAIN QUERY PLAN`:
 
 ```sql
 -- Query original
-EXPLAIN ANALYZE
+EXPLAIN QUERY PLAN
 SELECT *
 FROM (SELECT * FROM clientes) AS todos_clientes
 WHERE cliente_id IN (
@@ -213,26 +246,26 @@ WHERE cliente_id IN (
 
 ```sql
 -- Query refatorada
-EXPLAIN ANALYZE
+EXPLAIN QUERY PLAN
 WITH media_vendas AS (
     SELECT AVG(valor_total) AS media_geral FROM vendas
 ),
 clientes_acima_da_media AS (
-    SELECT DISTINCT cliente_id FROM vendas, media_vendas
-    WHERE valor_total > media_vendas.media_geral
+    SELECT DISTINCT v.cliente_id FROM vendas AS v, media_vendas AS m
+    WHERE v.valor_total > m.media_geral
 )
-SELECT c.cliente_id, c.nome, c.email, c.cidade, c.data_cadastro
+SELECT c.cliente_id, c.nome, c.email, c.cidade, c.estado, c.data_cadastro
 FROM clientes AS c
 INNER JOIN clientes_acima_da_media AS cam ON c.cliente_id = cam.cliente_id
 ORDER BY c.nome;
 ```
 
 **Pontos para chamar atenção no plano:**
-- Quantas vezes `AVG(valor_total)` aparece no plano original?
-- O otimizador do banco já eliminou alguma das redundâncias automaticamente?
-- O número de linhas estimadas é compatível com o resultado?
+- Onde aparece `SCAN` (varredura completa)?
+- O otimizador já eliminou alguma das redundâncias automaticamente?
+- Como o resultado muda se criarmos um índice em `vendas(valor_total)`?
 
-> **Nota:** com apenas 10 linhas de dados de exemplo, a diferença de tempo real será imperceptível. O exercício serve para criar o hábito de ler planos de execução — o ganho aparece em tabelas grandes.
+> **Nota:** com 3.000 linhas de vendas, a diferença de tempo real pode ser imperceptível. O exercício serve para criar o hábito de ler planos de execução — o ganho aparece em tabelas de produção com milhões de linhas.
 
 ---
 

@@ -1,24 +1,29 @@
 # Exercícios — Módulo 1: SQL Fundamentals
 
-Use o dataset de e-commerce em `recursos/datasets/` (tabelas: `clientes`, `produtos`, `vendas`).
-
-Consulte o `schema.md` se precisar relembrar a estrutura das tabelas.
-
-As soluções estão em `gabarito.md` — tente resolver antes de consultá-las.
+> **Antes de começar:** conecte ao banco `recursos/dados.db` e execute as queries diretamente nele.
+>
+> Opção 1 — SQLite CLI: `sqlite3 recursos/dados.db` (depois `.headers on` e `.mode column`)
+> Opção 2 — Python: `import sqlite3; conn = sqlite3.connect('recursos/dados.db')`
+>
+> Consulte o `recursos/schema.md` se precisar relembrar a estrutura das tabelas (categorias, produtos, clientes, vendas).
+>
+> As soluções estão em `gabarito.md` — tente resolver antes de consultá-las.
 
 ---
 
 ## Nível 1 — Básico
 
-### Exercício 1.1 — Produtos por categoria e preço
+### Exercício 1.1 — Produtos por categoria
 
-Liste todos os produtos da categoria **Eletrônicos**, exibindo o nome e o preço, ordenados do mais caro para o mais barato.
+Liste todos os produtos da categoria **Eletronicos**, exibindo o nome do produto e o preço, ordenados do mais caro para o mais barato.
+
+**Dica:** a tabela `produtos` tem a coluna `categoria_id`; a tabela `categorias` tem o campo `nome`. Você precisará de um JOIN.
 
 **Colunas esperadas no resultado:** `nome`, `preco`
 
 ---
 
-### Exercício 1.2 — Contagem de vendas em março de 2024
+### Exercício 1.2 — Contagem de vendas em um período
 
 Quantas vendas foram realizadas no mês de **março de 2024**?
 
@@ -42,7 +47,7 @@ Retorne o nome de cada cliente e o total que ele gastou. Clientes que ainda não
 
 **Colunas esperadas no resultado:** `nome`, `total_gasto`
 
-**Dica:** pense em qual tipo de JOIN preserva todos os clientes, mesmo sem correspondência em `vendas`.
+**Dica:** pense em qual tipo de JOIN preserva todos os clientes, mesmo sem correspondência em `vendas`. Use `COALESCE` para tratar o NULL resultante.
 
 ---
 
@@ -54,11 +59,11 @@ Qual produto teve o maior número total de **unidades vendidas**? Retorne apenas
 
 ---
 
-### Exercício 2.3 — Top 3 cidades com mais clientes
+### Exercício 2.3 — Top 5 estados com maior receita
 
-Liste as 3 cidades com o maior número de clientes cadastrados, em ordem decrescente.
+Liste os 5 estados (coluna `estado` da tabela `clientes`) com maior receita total gerada, em ordem decrescente. Inclua apenas estados que tenham ao menos uma venda.
 
-**Colunas esperadas no resultado:** `cidade`, `qtd_clientes`
+**Colunas esperadas no resultado:** `estado`, `receita_total`
 
 ---
 
@@ -70,7 +75,7 @@ Retorne o nome de cada cliente, o total que ele gastou e o seu **rank** entre to
 
 **Colunas esperadas no resultado:** `nome`, `total_gasto`, `rank_receita`
 
-**Dica:** use uma window function com `RANK()` ou `DENSE_RANK()`.
+**Dica:** use uma CTE para calcular o total por cliente e depois aplique `RANK()` ou `DENSE_RANK()` como window function.
 
 ---
 
@@ -80,7 +85,7 @@ Calcule a receita de cada mês de 2024 e a **receita acumulada** até aquele mê
 
 **Colunas esperadas no resultado:** `mes`, `receita_mes`, `receita_acumulada`
 
-**Dica:** use uma CTE para agregar por mês e depois aplique uma window function com `SUM() OVER`.
+**Dica:** use uma CTE para agregar por mês com `strftime('%Y-%m', data_venda)` e depois aplique `SUM() OVER (ORDER BY mes)`.
 
 ---
 

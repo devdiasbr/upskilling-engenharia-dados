@@ -1,6 +1,36 @@
 # Conteúdo — Módulo 1: SQL Fundamentals
 
-> Antes de começar, leia o `recursos/datasets/schema.md` para entender as tabelas `clientes`, `produtos` e `vendas`.
+> Antes de começar, leia o `recursos/schema.md` para entender as tabelas `categorias`, `produtos`, `clientes` e `vendas`.
+
+---
+
+## Como conectar ao banco
+
+O banco SQLite está em `recursos/dados.db`. Caso ainda não tenha criado o banco, rode primeiro:
+
+```bash
+python recursos/setup_db.py
+```
+
+### Opção 1 — SQLite CLI
+
+```bash
+sqlite3 recursos/dados.db
+.headers on
+.mode column
+```
+
+### Opção 2 — Python
+
+```python
+import sqlite3
+conn = sqlite3.connect('recursos/dados.db')
+cursor = conn.cursor()
+cursor.execute("SELECT * FROM clientes LIMIT 5")
+for row in cursor.fetchall():
+    print(row)
+conn.close()
+```
 
 ---
 
@@ -42,18 +72,13 @@ SELECT
     cliente_id,
     nome,
     email,
-    cidade
+    cidade,
+    estado
 FROM clientes
 WHERE cidade = 'São Paulo'
+   OR estado = 'SP'
 ORDER BY nome ASC;
 ```
-
-**Resultado esperado** (com os dados de exemplo):
-
-| cliente_id | nome        | email           | cidade     |
-|------------|-------------|-----------------|------------|
-| 1          | Ana Lima    | ana@email.com   | São Paulo  |
-| 4          | Diego Rocha | diego@email.com | São Paulo  |
 
 ### Exemplo: vendas de fevereiro de 2024
 
@@ -83,7 +108,8 @@ ORDER BY data_venda;
 
 Os dados estão distribuídos em tabelas separadas para evitar redundância. O JOIN combina linhas de tabelas diferentes com base em uma condição, geralmente uma chave estrangeira.
 
-No nosso dataset:
+No nosso banco:
+- `produtos.categoria_id` aponta para `categorias.categoria_id`
 - `vendas.cliente_id` aponta para `clientes.cliente_id`
 - `vendas.produto_id` aponta para `produtos.produto_id`
 
@@ -97,30 +123,26 @@ No nosso dataset:
 | `FULL JOIN` | Todas as linhas de ambas as tabelas; NULL onde não há correspondência em nenhum lado |
 
 > **Dica:** `INNER JOIN` e `JOIN` são equivalentes. `LEFT JOIN` e `LEFT OUTER JOIN` também.
+>
+> **SQLite:** não suporta `RIGHT JOIN` nem `FULL JOIN` nativamente. Reescreva invertendo a ordem das tabelas (`RIGHT JOIN A, B` vira `LEFT JOIN B, A`) ou usando `UNION ALL` para o FULL JOIN.
 
-### Exemplo: vendas com nome do cliente e produto (INNER JOIN)
+### Exemplo: vendas com nome do cliente, produto e categoria (INNER JOIN)
 
 ```sql
 SELECT
     v.venda_id,
-    c.nome       AS cliente,
-    p.nome       AS produto,
+    c.nome           AS cliente,
+    p.nome           AS produto,
+    cat.nome         AS categoria,
     v.quantidade,
     v.data_venda,
     v.valor_total
 FROM vendas AS v
-INNER JOIN clientes AS c ON v.cliente_id = c.cliente_id
-INNER JOIN produtos AS p ON v.produto_id = p.produto_id
+INNER JOIN clientes  AS c   ON v.cliente_id  = c.cliente_id
+INNER JOIN produtos  AS p   ON v.produto_id  = p.produto_id
+INNER JOIN categorias AS cat ON p.categoria_id = cat.categoria_id
 ORDER BY v.data_venda;
 ```
-
-**Resultado esperado** (primeiras linhas):
-
-| venda_id | cliente     | produto          | quantidade | data_venda | valor_total |
-|----------|-------------|------------------|------------|------------|-------------|
-| 1        | Ana Lima    | Notebook Pro     | 1          | 2024-01-10 | 3500.00     |
-| 2        | Bruno Silva | Camiseta Básica  | 3          | 2024-01-15 | 179.70      |
-| 3        | Ana Lima    | Fone Bluetooth   | 1          | 2024-02-01 | 299.00      |
 
 ### Exemplo: clientes SEM compras (LEFT JOIN com IS NULL)
 
@@ -135,8 +157,6 @@ WHERE v.venda_id IS NULL;
 ```
 
 **Como funciona:** o LEFT JOIN preserva todos os clientes. Para aqueles sem venda, as colunas de `vendas` ficam NULL. O filtro `WHERE v.venda_id IS NULL` mantém somente esses casos.
-
-> Com os dados de exemplo, todos os 5 clientes possuem ao menos uma compra, então o resultado seria vazio. Experimente inserir um cliente sem venda para testar.
 
 ---
 
@@ -159,14 +179,16 @@ WHERE v.venda_id IS NULL;
 
 ```sql
 -- CORRETO
-SELECT categoria, COUNT(*) AS qtd_produtos
-FROM produtos
-GROUP BY categoria;
+SELECT cat.nome AS categoria, COUNT(*) AS qtd_produtos
+FROM produtos AS p
+INNER JOIN categorias AS cat ON p.categoria_id = cat.categoria_id
+GROUP BY cat.nome;
 
--- INCORRETO — nome não está no GROUP BY nem agregado
-SELECT categoria, nome, COUNT(*)
-FROM produtos
-GROUP BY categoria;  -- erro em bancos estritos
+-- INCORRETO — p.nome não está no GROUP BY nem agregado
+SELECT cat.nome, p.nome, COUNT(*)
+FROM produtos AS p
+INNER JOIN categorias AS cat ON p.categoria_id = cat.categoria_id
+GROUP BY cat.nome;  -- erro em bancos estritos
 ```
 
 ### Filtrando grupos com HAVING
@@ -174,32 +196,27 @@ GROUP BY categoria;  -- erro em bancos estritos
 `WHERE` filtra linhas individuais (antes do agrupamento). `HAVING` filtra grupos (depois do agrupamento).
 
 ```sql
-SELECT categoria, AVG(preco) AS preco_medio
-FROM produtos
-GROUP BY categoria
-HAVING AVG(preco) > 200;
+SELECT cat.nome AS categoria, AVG(p.preco) AS preco_medio
+FROM produtos AS p
+INNER JOIN categorias AS cat ON p.categoria_id = cat.categoria_id
+GROUP BY cat.nome
+HAVING AVG(p.preco) > 200;
 ```
 
 ### Exemplo: receita total por categoria
 
 ```sql
 SELECT
-    p.categoria,
-    SUM(v.valor_total)            AS receita_total,
-    COUNT(DISTINCT v.venda_id)    AS qtd_vendas,
-    ROUND(AVG(v.valor_total), 2)  AS ticket_medio
+    cat.nome                          AS categoria,
+    SUM(v.valor_total)                AS receita_total,
+    COUNT(DISTINCT v.venda_id)        AS qtd_vendas,
+    ROUND(AVG(v.valor_total), 2)      AS ticket_medio
 FROM vendas AS v
-INNER JOIN produtos AS p ON v.produto_id = p.produto_id
-GROUP BY p.categoria
+INNER JOIN produtos   AS p   ON v.produto_id   = p.produto_id
+INNER JOIN categorias AS cat ON p.categoria_id = cat.categoria_id
+GROUP BY cat.categoria_id, cat.nome
 ORDER BY receita_total DESC;
 ```
-
-**Resultado esperado:**
-
-| categoria    | receita_total | qtd_vendas | ticket_medio |
-|--------------|---------------|------------|--------------|
-| Eletrônicos  | 9995.00       | 6          | 1665.83      |
-| Roupas       | 728.90        | 4          | 182.23       |
 
 ---
 
@@ -242,16 +259,8 @@ SELECT
 FROM receita_por_cliente AS r
 INNER JOIN clientes AS c ON r.cliente_id = c.cliente_id
 ORDER BY r.receita_total DESC
-LIMIT 3;
+LIMIT 10;
 ```
-
-**Resultado esperado:**
-
-| nome        | receita_total | qtd_compras |
-|-------------|---------------|-------------|
-| Ana Lima    | 5397.00       | 3           |
-| Bruno Silva | 3679.70       | 2           |
-| Carla Santos| 1098.50       | 2           |
 
 ### CTEs encadeadas
 
@@ -269,7 +278,7 @@ clientes_premium AS (
     FROM receita_por_cliente
     WHERE receita_total > 1000
 )
-SELECT c.nome, c.cidade
+SELECT c.nome, c.cidade, c.estado
 FROM clientes AS c
 INNER JOIN clientes_premium AS cp ON c.cliente_id = cp.cliente_id;
 ```
@@ -308,38 +317,40 @@ FUNÇÃO() OVER (
 | `SUM() OVER (...)` | Soma acumulada ou por partição |
 | `AVG() OVER (...)` | Média por partição |
 
-### Exemplo: média de preço por categoria e rank por preço
+### Exemplo: rank de clientes por receita total
 
 ```sql
+WITH receita_por_cliente AS (
+    SELECT
+        c.cliente_id,
+        c.nome,
+        c.estado,
+        COALESCE(SUM(v.valor_total), 0) AS receita_total
+    FROM clientes AS c
+    LEFT JOIN vendas AS v ON c.cliente_id = v.cliente_id
+    GROUP BY c.cliente_id, c.nome, c.estado
+)
 SELECT
     nome,
-    categoria,
-    preco,
-    ROUND(AVG(preco) OVER (PARTITION BY categoria), 2)  AS preco_medio_categoria,
-    RANK() OVER (PARTITION BY categoria ORDER BY preco DESC) AS rank_preco_na_categoria
-FROM produtos
-ORDER BY categoria, rank_preco_na_categoria;
+    estado,
+    receita_total,
+    RANK() OVER (ORDER BY receita_total DESC)        AS rank_geral,
+    RANK() OVER (PARTITION BY estado ORDER BY receita_total DESC) AS rank_por_estado
+FROM receita_por_cliente
+ORDER BY rank_geral;
 ```
 
-**Resultado esperado:**
+### Exemplo: receita acumulada por mês (SQLite)
 
-| nome             | categoria   | preco   | preco_medio_categoria | rank_preco_na_categoria |
-|------------------|-------------|---------|----------------------|-------------------------|
-| Notebook Pro     | Eletrônicos | 3500.00 | 1532.67              | 1                       |
-| Smartwatch       | Eletrônicos | 799.00  | 1532.67              | 2                       |
-| Fone Bluetooth   | Eletrônicos | 299.00  | 1532.67              | 3                       |
-| Calça Jeans      | Roupas      | 129.90  | 94.90                | 1                       |
-| Camiseta Básica  | Roupas      | 59.90   | 94.90                | 2                       |
-
-### Exemplo: receita acumulada por mês
+Em SQLite, use `strftime` em vez de `DATE_TRUNC`:
 
 ```sql
 WITH receita_mensal AS (
     SELECT
-        DATE_TRUNC('month', data_venda) AS mes,
-        SUM(valor_total) AS receita_mes
+        strftime('%Y-%m', data_venda) AS mes,
+        SUM(valor_total)              AS receita_mes
     FROM vendas
-    GROUP BY DATE_TRUNC('month', data_venda)
+    GROUP BY strftime('%Y-%m', data_venda)
 )
 SELECT
     mes,
@@ -354,16 +365,16 @@ ORDER BY mes;
 ```sql
 WITH receita_mensal AS (
     SELECT
-        DATE_TRUNC('month', data_venda) AS mes,
-        SUM(valor_total) AS receita_mes
+        strftime('%Y-%m', data_venda) AS mes,
+        SUM(valor_total)              AS receita_mes
     FROM vendas
-    GROUP BY DATE_TRUNC('month', data_venda)
+    GROUP BY strftime('%Y-%m', data_venda)
 )
 SELECT
     mes,
     receita_mes,
-    LAG(receita_mes) OVER (ORDER BY mes) AS receita_mes_anterior,
-    receita_mes - LAG(receita_mes) OVER (ORDER BY mes) AS variacao
+    LAG(receita_mes) OVER (ORDER BY mes)                            AS receita_mes_anterior,
+    receita_mes - LAG(receita_mes) OVER (ORDER BY mes)              AS variacao
 FROM receita_mensal
 ORDER BY mes;
 ```
@@ -389,11 +400,11 @@ SELECT * FROM vendas;
 SELECT venda_id, cliente_id, valor_total FROM vendas;
 ```
 
-**Por quê:** `SELECT *` transfere dados desnecessários pela rede, impede o uso de índices cobrindo colunas e quebra aplicações quando o schema muda.
+**Por quê:** `SELECT *` transfere dados desnecessários, impede o uso de índices cobrindo colunas e quebra aplicações quando o schema muda.
 
 ### 2. Filtre cedo
 
-Aplique condições `WHERE` na menor granularidade possível antes de fazer JOINs ou agregações. Em queries com subqueries ou CTEs, mova os filtros para dentro da CTE.
+Aplique condições `WHERE` na menor granularidade possível antes de fazer JOINs ou agregações.
 
 ```sql
 -- Menos eficiente: agrupa tudo e depois filtra
@@ -420,18 +431,19 @@ GROUP BY cliente_id;
 Índices aceleram buscas por coluna evitando varredura completa da tabela (full table scan). São criados automaticamente em chaves primárias; para outras colunas usadas em `WHERE`, `JOIN ON` ou `ORDER BY`, pode ser necessário criá-los manualmente:
 
 ```sql
-CREATE INDEX idx_vendas_data ON vendas (data_venda);
+CREATE INDEX idx_vendas_data    ON vendas (data_venda);
 CREATE INDEX idx_vendas_cliente ON vendas (cliente_id);
+CREATE INDEX idx_produtos_cat   ON produtos (categoria_id);
 ```
 
 **Atenção:** índices aceleram leituras mas podem desacelerar escritas (INSERT/UPDATE). Crie-os com critério.
 
-### 4. EXPLAIN e EXPLAIN ANALYZE
+### 4. EXPLAIN QUERY PLAN (SQLite)
 
-Use `EXPLAIN` para ver o plano de execução de uma query sem executá-la. Use `EXPLAIN ANALYZE` para executar e ver os tempos reais.
+No SQLite, use `EXPLAIN QUERY PLAN` para ver como o banco executará a query:
 
 ```sql
-EXPLAIN ANALYZE
+EXPLAIN QUERY PLAN
 SELECT c.nome, SUM(v.valor_total)
 FROM vendas AS v
 INNER JOIN clientes AS c ON v.cliente_id = c.cliente_id
@@ -439,9 +451,7 @@ GROUP BY c.nome;
 ```
 
 Procure no resultado por:
-- **Seq Scan**: varredura completa (pode indicar falta de índice)
-- **Index Scan**: uso de índice (eficiente)
-- **Hash Join / Nested Loop**: estratégia de JOIN escolhida pelo otimizador
-- **rows**: estimativa de linhas processadas em cada etapa
+- **SCAN**: varredura completa (pode indicar falta de índice)
+- **SEARCH ... USING INDEX**: uso de índice (eficiente)
 
-> `EXPLAIN ANALYZE` está disponível no PostgreSQL. MySQL usa `EXPLAIN FORMAT=JSON`. BigQuery usa `INFORMATION_SCHEMA.JOBS_BY_PROJECT`.
+> Em PostgreSQL use `EXPLAIN ANALYZE`. No MySQL use `EXPLAIN FORMAT=JSON`. No BigQuery use `INFORMATION_SCHEMA.JOBS_BY_PROJECT`.
