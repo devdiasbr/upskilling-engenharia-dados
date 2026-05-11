@@ -35,7 +35,7 @@
    │ schema-on-write│   │ schema-on-read │   │ ACID +          │
    │ dados limpos   │   │ dados brutos   │   │ armazenamento   │
    │ SQL analítico  │   │ formato livre  │   │ barato          │
-   │ Snowflake/BQ   │   │ S3/ADLS/GCS   │   │ Delta/Iceberg   │
+   │ Snowflake/BQ   │   │ S3/ADLS/GCS    │   │ Delta/Iceberg   │
    └────────────────┘   └────────────────┘   └─────────────────┘
    ```
 
@@ -47,7 +47,7 @@
          │
          ▼ extração (Módulo 4/5)
    ┌─────────────────────────────────────┐
-   │           Data Lake                  │
+   │           Data Lake                 │
    │  raw/ ──► trusted/ ──► refined/     │
    └─────────────────────────────────────┘
          │
