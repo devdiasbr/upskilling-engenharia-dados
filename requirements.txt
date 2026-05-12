@@ -1,0 +1,25 @@
+# ── Obrigatório ───────────────────────────────────────────────────────────────
+# Usado em todos os módulos de exercícios e no setup do banco
+
+pandas>=2.0
+pyarrow>=14.0        # leitura/escrita de Parquet (Módulos 3–9)
+faker>=24.0          # geração do banco de dados (recursos/setup_db.py)
+
+# ── Testes ────────────────────────────────────────────────────────────────────
+# Módulos 8 e 9 — TDD com pytest
+
+pytest>=8.0
+
+# ── Opcional — Delta Lake ─────────────────────────────────────────────────────
+# Módulo 3 (demo bônus de time travel) — não é necessário para os exercícios
+
+# deltalake>=0.17
+
+# ── Não incluso — ferramentas de próximos passos ──────────────────────────────
+# Mencionadas no conteúdo como continuação natural da trilha.
+# Instale separadamente se quiser explorar além dos fundamentos.
+#
+# apache-airflow>=2.9      # Módulo 6 — orquestração (requer ambiente dedicado)
+# pyspark>=3.5             # Módulo 7 — processamento distribuído (requer JVM)
+# great-expectations>=0.18 # Módulo 8 — qualidade declarativa
+# dbt-core>=1.8            # qualidade e transformação declarativa

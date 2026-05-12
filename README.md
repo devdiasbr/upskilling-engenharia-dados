@@ -11,11 +11,11 @@ Formação prática em fundamentos de engenharia de dados estruturada em 9 módu
 git clone https://github.com/devdiasbr/upskilling-engenharia-dados.git
 cd upskilling-engenharia-dados
 
-# 2. Crie o banco de dados (SQLite — sem instalação extra)
-python recursos/setup_db.py
+# 2. Instale as dependências
+pip install -r requirements.txt
 
-# 3. Instale as dependências Python
-pip install pandas pyarrow
+# 3. Crie o banco de dados (SQLite — sem instalação extra)
+python recursos/setup_db.py
 
 # 4. Comece pelo Módulo 1
 cat modulos/01-sql-fundamentals/README.md
