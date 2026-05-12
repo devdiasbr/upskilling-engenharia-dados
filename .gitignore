@@ -3,6 +3,3 @@ recursos/exports/
 __pycache__/
 *.pyc
 .venv/
-
-# Gabaritos dos exercícios
-modulos/**/exercicios/gabarito.md
